@@ -1,0 +1,225 @@
+<html>
+	<head>
+		<title>IndexDB</title>
+		<script type="text/javascript">
+		//https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB
+		var conexao;
+		
+		(function() {
+		  'use strict';
+
+		  //check for support
+		  if (!('indexedDB' in window)) {
+			console.log('This browser doesn\'t support IndexedDB');
+			return;
+		  } else {
+			console.log('IndexDB OK!');
+		  }
+
+		  //var dbPromise = indexedDB.open('test-db1', 1);
+		   var dbPromise = indexedDB.open('test-db1', 3);
+		   dbPromise.onerror = function(event) {
+			  alert("IndexedDB não habilitado");
+			};
+			dbPromise.onsuccess = function(event) {
+			  conexao = event.target.result;
+			  ListarRegistro();
+			  //AtualizarRegistro(5, {});
+			};
+			dbPromise.onupgradeneeded = function(event) {
+				var db = event.target.result;
+				console.log('Criando um objeto indicacao');
+				if (!db.objectStoreNames.contains('indicacoes')) {
+				  var indicacoes = db.createObjectStore('indicacoes', {keyPath: 'id', autoIncrement:true});
+				  indicacoes.createIndex('email', 'email', {unique: false});
+				}
+			};
+		  
+		  
+		  
+		})();
+		
+		function AdicionarRegistro(item){
+			console.log(conexao);
+			var tx = conexao.transaction(["indicacoes"], "readwrite");
+			var indicacao = tx.objectStore('indicacoes');
+			//var item = {
+			//	name: 'sandwich',
+			//	price: 4.99,
+			//	description: 'A very tasty sandwich',
+			//	created: new Date().getTime()
+			//};
+			indicacao.add(item);
+			
+			tx.oncomplete = function(event) {
+			  console.log('Adicionada uma nova indicacao!');
+			  LimparCampos();
+			  apagarTabela();
+			  ListarRegistro();
+			};
+
+			tx.onerror = function(event) {
+			  console.log('Erro adicionar indicacao!');
+			};
+			
+		}
+		
+		function LimparCampos(){
+			document.getElementById("txtNome").value = "";
+			document.getElementById("txtEmail").value = "";
+			document.getElementById("txtTelefone").value ="";
+			document.getElementById("txtCodigo").value = 0;
+		}
+		
+		function AtualizarRegistro(chave, registros){
+			var objectStore2 = conexao.transaction(["indicacoes"], "readwrite").objectStore("indicacoes");
+			var request2 = objectStore2.get(chave);
+			console.log(request2);
+			request2.onerror = function(event) {
+			  console.log('Erro ao retornar registro para atualizar');
+			};
+			request2.onsuccess = function(event) {
+			  console.log(chave);
+			  console.log('Sucesso ao comunicar com o banco para atualizar');
+			  var data = event.target.result;
+			  console.log(data);
+			  if (!data) {
+				console.log('Registro nao localizado');
+			  } else {
+				console.log('Registro localizado');
+				data.nome = registros.nome;
+				data.email = registros.email;
+				data.telefone = registros.telefone;
+				// Put this updated object back into the database.
+				var requestUpdate = objectStore2.put(data);
+				   requestUpdate.onerror = function(event) {
+					 console.log('Erro ao atualizar');
+				   };
+				   requestUpdate.onsuccess = function(event) {
+					 console.log('Registro atualizado');
+					 LimparCampos();
+				   };
+				}
+			};
+		}
+		
+		function ListarRegistro(){
+			
+			var objectStore = conexao.transaction("indicacoes").objectStore("indicacoes");
+			objectStore.openCursor().onsuccess = function(event) {
+			  var cursor = event.target.result;
+			  if (cursor) {
+				//alert("Name for SSN " + cursor.key + " is " + cursor.value.name);
+				var conteudo_html = "<tr><td>" + cursor.key + "</td><td>" +  cursor.value.nome +  "</td><td>" +  cursor.value.email +  "</td><td>" +  cursor.value.telefone +  "</td><td>" +  cursor.value.created +  "</td><td><a  href=# onclick=ExcluirRegistro(" + cursor.key + ")>Excluir</a></td><td><a  href=# onclick=SelecionarRegistro(" + cursor.key + ")>Editar</a></td></tr>";
+				var tableRef = document.getElementById('tblResultados').getElementsByTagName('tbody')[0];
+				var newRow   = tableRef.insertRow(tableRef.rows.length);
+				newRow.innerHTML = conteudo_html;
+				
+				cursor.continue();
+			  }
+			  else {
+				console.log('Fim da Tabela');
+			  }
+			};
+		}
+		
+		
+		function ExcluirRegistro(chave){
+			var request = conexao.transaction(["indicacoes"], "readwrite")
+                .objectStore("indicacoes")
+                .delete(chave);
+			request.onsuccess = function(event) {
+				console.log('Produto excluido');
+				apagarTabela();
+				ListarRegistro();
+			};
+		}
+		
+		function SelecionarRegistro(chave){
+			console.log(chave);
+			console.log('chave do registro');
+			var transaction = conexao.transaction(["indicacoes"]);
+			var objectStore = transaction.objectStore("indicacoes");
+			var request = objectStore.get(chave);
+			request.onerror = function(event) {
+			  // Handle errors!
+			  console.log('Problema ao retornar registro');
+			};
+			request.onsuccess = function(event) {
+			  document.getElementById("txtNome").value = request.result.nome;
+			  document.getElementById("txtEmail").value = request.result.email;
+			  document.getElementById("txtTelefone").value = request.result.telefone;
+			   document.getElementById("txtCodigo").value = request.result.id;
+			   console.log(request.result);
+			  console.log('Registro localizado');
+			};
+		}
+		
+		function apagarTabela(){
+			var tb = document.querySelector('#tblResultados tbody');
+			while (tb.childNodes.length) {
+				tb.removeChild(tb.childNodes[0]);
+			}
+		}
+		
+		</script>
+	</head>
+	<body>
+		Teste IndexDB<br/>
+		
+		<!---
+		<input type="button" value="Adicionar Indicacao" onclick="AdicionarRegistro();"> 
+		--->
+		<p>Novo Registro</p>
+		<form>
+			<label>Nome</label>
+			<input type="text" id="txtNome" name="nome"><br/>
+			<label>E-mail</label>
+			<input type="text" id="txtEmail" name="email"><br/>
+			<label>Telefone</label>
+			<input type="text" id="txtTelefone" name="telefone"><br/>
+			<input type="hidden" name="codigo" id="txtCodigo" value="0">
+			<input type="button" id="btnSalvar" value="Salvar Registro">
+		</form>
+		
+		<p>Registros</p>
+		<table border="1" id="tblResultados">
+			<thead>
+				<th>ID</th>
+				<th>Nome</th>
+				<th>Email</th>
+				<th>Telefone</th>
+				<th>Data Cadastro</th>
+				<th>Excluir</th>
+				<th>Editar</th>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+	</body>
+	<script type="text/javascript">
+		document.getElementById("btnSalvar").addEventListener("click",function(){
+		var var_nome = document.getElementById("txtNome").value;
+		var var_email = document.getElementById("txtEmail").value;
+		var var_telefone = document.getElementById("txtTelefone").value;
+		var chave = document.getElementById("txtCodigo").value;
+		//Importante! Tem que ser o mesmo tipo da chave do objeto!
+		chave = parseInt(chave);
+		var item = {
+			nome: var_nome,
+			email: var_email,
+			telefone: var_telefone,
+			created: new Date().getTime()
+		};
+		
+		if (chave ==0){
+			AdicionarRegistro(item);
+		} else {
+			AtualizarRegistro(chave, item);
+		}
+			
+	});
+	
+	
+	</script>
+</html>
